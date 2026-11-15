@@ -56,7 +56,10 @@ CFontManager::~CFontManager()
 	FOR_EACH_HASHMAP( m_FontFiles, i )
 	{
 		byte *p = m_FontFiles.Element( i ).data;
-		EngFuncs::COM_FreeFile( p );
+		if( m_FontFiles.Element( i ).system )
+			free( p );
+		else
+			EngFuncs::COM_FreeFile( p );
 	}
 
 	m_FontFiles.Purge();
@@ -536,6 +539,21 @@ bool CFontManager::FindFontDataFile( const char *name, int tall, int weight, int
 {
 	if( !strcmp( name, "Trebuchet MS" ))
 	{
+		// cry of fear's gameui menu uses times new roman bold,
+		// android has no times so take its own bold serif font instead
+		static const char *serif[] = { "/system/fonts/NotoSerif-Bold.ttf", "/system/fonts/DroidSerif-Bold.ttf", "/product/fonts/NotoSerif-Bold.ttf", "/system/fonts/NotoSerif-Regular.ttf", "/system/fonts/DroidSerif-Regular.ttf" };
+
+		for( size_t i = 0; i < sizeof( serif ) / sizeof( serif[0] ); i++ )
+		{
+			FILE *f = fopen( serif[i], "rb" );
+			if( f )
+			{
+				fclose( f );
+				Q_strncpy( dataFile, serif[i], dataFileChars );
+				return true;
+			}
+		}
+
 		Q_strncpy( dataFile, "gfx/fonts/FiraSans-Regular.ttf", dataFileChars );
 		return true;
 	}
@@ -559,13 +577,34 @@ byte *CFontManager::LoadFontDataFile( const char *vfspath, int *plen )
 		return m_FontFiles[i].data;
 	}
 	int len = 0;
-	byte *p = EngFuncs::COM_LoadFile( vfspath, &len );
+	byte *p = nullptr;
+	bool system = vfspath[0] == '/';
+
+	if( system )
+	{
+		FILE *f = fopen( vfspath, "rb" );
+		if( f )
+		{
+			fseek( f, 0, SEEK_END );
+			len = ftell( f );
+			fseek( f, 0, SEEK_SET );
+			p = (byte *)malloc( len );
+			if( p && fread( p, 1, len, f ) != (size_t)len )
+			{
+				free( p );
+				p = nullptr;
+			}
+			fclose( f );
+		}
+	}
+	else p = EngFuncs::COM_LoadFile( vfspath, &len );
+
 	if( p != nullptr )
 	{
 		if( plen )
 			*plen = len;
 
-		font_file file = { len, p };
+		font_file file = { len, p, system };
 		m_FontFiles.Insert( vfspath, file );
 	}
 

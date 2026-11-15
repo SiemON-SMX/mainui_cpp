@@ -79,8 +79,6 @@ private:
 
 	CMenuAction axisBind_label;
 
-	CMenuCheckBox enableOsk;
-
 	class CPresetsListModel : public CMenuBaseModel, public CUtlVector<CUtlString>
 	{
 	public:
@@ -171,8 +169,6 @@ void CMenuGamePad::GetConfig( void )
 {
 	float _side, _forward, _pitch, _yaw;
 
-	enableOsk.LinkCvar( "osk_enable" );
-
 	_side = EngFuncs::GetCvarFloat( "joy_side" );
 	_forward = EngFuncs::GetCvarFloat( "joy_forward" );
 	_pitch = EngFuncs::GetCvarFloat( "joy_pitch" );
@@ -237,8 +233,6 @@ void CMenuGamePad::SaveAndPopMenu()
 	EngFuncs::CvarSetValue( "joy_pitch", _pitch );
 	EngFuncs::CvarSetValue( "joy_yaw", _yaw );
 	EngFuncs::CvarSetString( "joy_axis_binding", binding );
-
-	enableOsk.WriteCvar();
 
 	CMenuFramework::SaveAndPopMenu();
 }
@@ -312,8 +306,6 @@ void CMenuGamePad::_Init( void )
 
 	banner.SetPicture( ART_BANNER );
 
-	enableOsk.SetNameAndStatus( L( "Builtin on-screen keyboard" ), L( "Enable builtin on-screen keyboard in case your platform doesn't have any" ));
-
 	axisBind_label.eTextAlignment = QM_CENTER;
 	axisBind_label.iFlags = QMF_INACTIVE|QMF_DROPSHADOW;
 	axisBind_label.colorBase = uiColorHelp;
@@ -359,7 +351,6 @@ void CMenuGamePad::_Init( void )
 	AddButton( L( "Done" ), nullptr, PC_DONE, VoidCb( &CMenuGamePad::SaveAndPopMenu ) );	// Обе строки уже встречались ранее !!
 	for( i = 0; i < 6; i++ )
 		AddItem( axisBind[i] );
-	AddItem( enableOsk );
 	AddItem( side );
 	AddItem( invSide );
 	AddItem( forward );
@@ -402,8 +393,6 @@ void CMenuGamePad::_VidInit()
 	yaw.SetCoord( 630, 430 + sliderAlign );
 	yaw.SetCharSize( QM_SMALLFONT );
 	invYaw.SetCoord( 850, 430 );
-
-	enableOsk.SetCoord( 630, 480 );
 
 	presets.SetRect( 630, 530, 330, 140 );
 

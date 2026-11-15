@@ -58,17 +58,18 @@ const char	*uiSounds[] = {
 
 // they match default WON colors.lst now, except alpha
 // a1ba: made uiColorHelp brighter so it's easier to read
-unsigned int uiColorHelp        = 0xFFA0A0A0; // 160, 160, 160, 255 // hint letters color
-unsigned int uiPromptBgColor    = 0xFF383838; // 56,  56,  56,  255 // dialog background color
-unsigned int uiPromptTextColor  = 0xFFF0B418; // 240, 180, 24,  255 // dialog or button letters color
-unsigned int uiPromptFocusColor = 0xFFFFFF00; // 255, 255,  0,  255 // dialog or button focus letters color
-unsigned int uiInputTextColor   = 0xFFF0B418; // 240, 180, 24,  255
-unsigned int uiInputBgColor     = 0x80383838; // 56,  56,  56,  128 // field, scrollist, checkbox background color
-unsigned int uiInputFgColor     = 0xFF555555; // 85,  85,  85,  255 // field, scrollist, checkbox foreground color
+// cry of fear: values from its resource/trackerscheme.res
+unsigned int uiColorHelp        = 0xFF707070; // DimListText
+unsigned int uiPromptBgColor    = 0xFF282828; // ControlBG
+unsigned int uiPromptTextColor  = 0xFFC8C8C8; // InGameDesktop MenuColor
+unsigned int uiPromptFocusColor = 0xFFFFFFFF; // InGameDesktop ArmedMenuColor
+unsigned int uiInputTextColor   = 0xFF5A5A5A; // ControlText
+unsigned int uiInputBgColor     = 0x80282828; // WindowBG
+unsigned int uiInputFgColor     = 0xFF707070; // BorderDark
 unsigned int uiColorWhite       = 0xFFFFFFFF; // 255, 255, 255, 255 // useful for bitmaps
 unsigned int uiColorDkGrey      = 0x80404040; // 64,  64,  64,  128 // shadow and grayed items
 unsigned int uiColorBlack       = 0x80000000; //  0,   0,   0,  128 // some controls background
-unsigned int uiColorConsole     = 0xFFF0B418; // just for reference
+unsigned int uiColorConsole     = 0xFFFFFFFF; // white like cry of fear's console
 
 // color presets (this is nasty hack to allow color presets to part of text)
 const unsigned int g_iColorTable[8] =
@@ -629,6 +630,59 @@ static bool UI_UpdateWindowInsets( void )
 UI_UpdateMenu
 =================
 */
+void UI_PlaySplashTrack( void )
+{
+	char *afile = (char *)EngFuncs::COM_LoadFile( "playlist.txt", NULL );
+	char *pfile = afile;
+	char token[1024];
+	char splash[256];
+	int version = 1;
+	int splashLoop = 1;
+
+	splash[0] = 0;
+
+	if( afile )
+	{
+		while(( pfile = EngFuncs::COM_ParseFile( pfile, token, sizeof( token ))) != NULL )
+		{
+			char key[1024];
+
+			if( !strcmp( token, "{" ) || !strcmp( token, "}" ))
+				continue;
+
+			Q_strncpy( key, token, sizeof( key ));
+
+			pfile = EngFuncs::COM_ParseFile( pfile, token, sizeof( token ));
+
+			if( !pfile )
+				break;
+
+			if( !strcmp( token, "{" ))
+				continue;
+
+			if( !stricmp( key, "Version" ))
+				version = atoi( token );
+			else if( !stricmp( key, "Splash" ))
+				Q_strncpy( splash, token, sizeof( splash ));
+			else if( !stricmp( key, "SplashLoop" ))
+				splashLoop = atoi( token );
+		}
+
+		EngFuncs::COM_FreeFile( afile );
+	}
+
+	if( !splash[0] )
+	{
+		EngFuncs::PlayBackgroundTrack( "media/gamestartup", "media/gamestartup" );
+		return;
+	}
+
+	if( version > 1 && !splashLoop )
+		EngFuncs::PlayBackgroundTrack( splash, NULL );
+	else
+		EngFuncs::PlayBackgroundTrack( splash, splash );
+}
+
 void UI_UpdateMenu( float flTime )
 {
 	if( !uiStatic.initialized )
@@ -694,7 +748,7 @@ void UI_UpdateMenu( float flTime )
 
 			// load background track
 			if( !CL_IsActive( ))
-				EngFuncs::PlayBackgroundTrack( "media/gamestartup", "media/gamestartup" );
+				UI_PlaySplashTrack();
 		}
 
 		uiStatic.firstDraw = false;
@@ -944,8 +998,14 @@ void UI_ApplyCustomColors( void )
 
 	if( !afile )
 	{
+		int	r, g, b;
+
 		// not error, not warning, just notify
 		Con_Printf( "UI_ApplyCustomColors: colors.lst not found\n" );
+
+		// still set our console colour, the engine one is the xash yellow
+		UnpackRGB( r, g, b, uiColorConsole );
+		EngFuncs::SetConsoleDefaultColor( r, g, b );
 		return;
 	}
 

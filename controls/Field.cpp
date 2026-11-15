@@ -133,6 +133,20 @@ void CMenuField::Clear( void )
 	iScroll = 0;
 }
 
+// tapping the field opens the system keyboard
+bool CMenuField::KeyUp( int key )
+{
+	if( UI::Key::IsLeftMouse( key ) && UI_CursorInRect( m_scPos.x, m_scPos.y, m_scSize.w, m_scSize.h ))
+	{
+		EngFuncs::SetTextInputRect( m_scPos.x, m_scPos.y, m_scSize.w, m_scSize.h );
+		EngFuncs::SetTextInputBuffer( szBuffer );
+		UI_EnableTextInput( true );
+		return true;
+	}
+
+	return CMenuEditable::KeyUp( key );
+}
+
 /*
 =================
 CMenuField::Key

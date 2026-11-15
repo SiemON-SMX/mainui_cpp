@@ -605,7 +605,7 @@ void CMenuTable::DrawLine( Point p, int line, uint textColor, bool forceCol, uin
 void CMenuTable::Draw()
 {
 	int i, y;
-	int selColor = PackRGB( 80, 56, 24 );
+	int selColor = PackRGBA( 224, 156, 48, 160 ); // cry of fear SelectionBG
 	int upFocus, downFocus, scrollbarFocus;
 
 	// HACKHACK: recalc iNumRows, to be not greater than iNumItems
@@ -768,7 +768,7 @@ void CMenuTable::Draw()
 			}
 			else if( i == iHighlight )
 			{
-				fillColor = 0x80383838;
+				fillColor = 0x96282828; // cry of fear WindowBG
 			}
 		}
 

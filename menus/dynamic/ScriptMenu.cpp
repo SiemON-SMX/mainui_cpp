@@ -493,11 +493,43 @@ void UI_AdvUserOptions_Menu()
 	menu_useroptions->Show();
 }
 
+static const char g_szCoFUserScript[] =
+	"VERSION 1.0\n"
+	"DESCRIPTION INFO_OPTIONS\n"
+	"{\n"
+	"\t\"gl_bump\" { \"Bump mapping\" { BOOL } { \"1\" } }\n"
+	"\t\"gl_specular\" { \"Specular highlights\" { BOOL } { \"1\" } }\n"
+	"\t\"gl_highspecular\" { \"High quality specular\" { BOOL } { \"1\" } }\n"
+	"\t\"gl_detailtex\" { \"Detail textures\" { BOOL } { \"1\" } }\n"
+	"\t\"gl_screenblur\" { \"Screen blur\" { BOOL } { \"1\" } }\n"
+	"\t\"cl_propdistance\" { \"Limit prop draw distance\" { BOOL } { \"0\" } }\n"
+	"\t\"r_weather\" { \"Weather effects\" { BOOL } { \"1\" } }\n"
+	"\t\"cl_ripples\" { \"Water ripples\" { BOOL } { \"1\" } }\n"
+	"\t\"cl_vignette\" { \"Vignette\" { BOOL } { \"1\" } }\n"
+	"\t\"cl_noiseeffect\" { \"Film grain\" { BOOL } { \"0\" } }\n"
+	"\t\"cl_noiseamount\" { \"Film grain amount\" { NUMBER 0 1 } { \"0.5\" } }\n"
+	"\t\"cl_cameraeffect\" { \"Camera viewfinder effect\" { BOOL } { \"0\" } }\n"
+	"\t\"cl_bloodeffects\" { \"Blood effects\" { BOOL } { \"1\" } }\n"
+	"\t\"cl_cheapweaponsmoke\" { \"Cheap weapon smoke\" { BOOL } { \"0\" } }\n"
+	"\t\"cl_smokeparticlelimit\" { \"Smoke particle limit\" { NUMBER 0 50 } { \"5\" } }\n"
+	"\t\"cl_lowflashlight\" { \"Low quality flashlight\" { BOOL } { \"0\" } }\n"
+	"\t\"cl_subtitles\" { \"Subtitles\" { BOOL } { \"1\" } }\n"
+	"}\n";
+
 void UI_LoadScriptConfig()
 {
 	// yes, create cvars if needed
 	menu_serveroptions->SetScriptConfig( "settings.scr", true, true );
 	menu_useroptions->SetScriptConfig( "user.scr", false, true );
+
+	if( !menu_useroptions->m_pVars )
+		menu_useroptions->SetScriptConfig( "user_default.scr", false, true );
+
+	if( !menu_useroptions->m_pVars && !EngFuncs::FileExists( "user.scr", false ) && !EngFuncs::FileExists( "user_default.scr", false ))
+	{
+		EngFuncs::COM_SaveFile( "user.scr", g_szCoFUserScript, sizeof( g_szCoFUserScript ) - 1 );
+		menu_useroptions->SetScriptConfig( "user.scr", false, true );
+	}
 }
 
 void UI_SaveScriptConfig()

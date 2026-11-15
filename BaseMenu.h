@@ -269,6 +269,7 @@ public:
 
 // Menus
 void UI_Main_Menu( void );
+void UI_PlaySplashTrack( void );
 void UI_NewGame_Menu( void );
 void UI_LoadGame_Menu( void );
 void UI_SaveGame_Menu( void );

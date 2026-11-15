@@ -31,6 +31,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "AnimatedBanner.h"
 #include "MovieBanner.h"
 
+#define MAX_GAMEMENU_ITEMS	16
+
+#define GAMEMENU_ONLYINGAME	BIT( 0 )
+#define GAMEMENU_NOTMULTI	BIT( 1 )
+#define GAMEMENU_NOTSINGLE	BIT( 2 )
+
 #define ART_MINIMIZE_N	"gfx/shell/min_n"
 #define ART_MINIMIZE_F	"gfx/shell/min_f"
 #define ART_MINIMIZE_D	"gfx/shell/min_d"
@@ -83,7 +89,164 @@ private:
 
 	bool bTrainMap;
 	bool bCustomGame;
+
+	bool LoadGameMenuRes( void );
+	void GameMenuCommand( const char *command );
+	void UpdateGameMenuItems( void );
+	void GameMenuItemCb( void *pExtra );
+
+	bool bGameMenuRes;
+	int iNumGameMenuItems;
+	CMenuPicButton gameMenuItems[MAX_GAMEMENU_ITEMS];
+	char gameMenuLabels[MAX_GAMEMENU_ITEMS][128];
+	char gameMenuCommands[MAX_GAMEMENU_ITEMS][256];
+	int gameMenuFlags[MAX_GAMEMENU_ITEMS];
 };
+
+bool CMenuMain::LoadGameMenuRes( void )
+{
+	char *afile = (char *)EngFuncs::COM_LoadFile( "resource/GameMenu.res", NULL );
+	char *pfile = afile;
+	char token[1024];
+	int depth = 0;
+	int item = -1;
+
+	iNumGameMenuItems = 0;
+
+	if( !afile )
+		return false;
+
+	while(( pfile = EngFuncs::COM_ParseFile( pfile, token, sizeof( token ))) != NULL )
+	{
+		if( !strcmp( token, "{" ))
+		{
+			depth++;
+
+			if( depth == 2 && iNumGameMenuItems < MAX_GAMEMENU_ITEMS )
+			{
+				item = iNumGameMenuItems++;
+				gameMenuLabels[item][0] = 0;
+				gameMenuCommands[item][0] = 0;
+				gameMenuFlags[item] = 0;
+			}
+			continue;
+		}
+
+		if( !strcmp( token, "}" ))
+		{
+			if( depth == 2 )
+				item = -1;
+
+			depth--;
+			continue;
+		}
+
+		if( depth != 2 || item < 0 )
+			continue;
+
+		char key[1024];
+		Q_strncpy( key, token, sizeof( key ));
+
+		pfile = EngFuncs::COM_ParseFile( pfile, token, sizeof( token ));
+
+		if( !pfile )
+			break;
+
+		if( !stricmp( key, "label" ))
+			Q_strncpy( gameMenuLabels[item], token, sizeof( gameMenuLabels[item] ));
+		else if( !stricmp( key, "command" ))
+			Q_strncpy( gameMenuCommands[item], token, sizeof( gameMenuCommands[item] ));
+		else if( !stricmp( key, "OnlyInGame" ) && atoi( token ))
+			gameMenuFlags[item] |= GAMEMENU_ONLYINGAME;
+		else if( !stricmp( key, "notmulti" ) && atoi( token ))
+			gameMenuFlags[item] |= GAMEMENU_NOTMULTI;
+		else if( !stricmp( key, "notsingle" ) && atoi( token ))
+			gameMenuFlags[item] |= GAMEMENU_NOTSINGLE;
+	}
+
+	EngFuncs::COM_FreeFile( afile );
+
+	return iNumGameMenuItems > 0;
+}
+
+void CMenuMain::GameMenuCommand( const char *command )
+{
+	if( !command || !command[0] )
+		return;
+
+	if( !stricmp( command, "OpenNewGameDialog" ))
+		UI_NewGame_Menu();
+	else if( !stricmp( command, "OpenLoadGameDialog" ))
+		UI_LoadGame_Menu();
+	else if( !stricmp( command, "OpenSaveGameDialog" ))
+		UI_SaveGame_Menu();
+	else if( !stricmp( command, "OpenOptionsDialog" ))
+		UI_Options_Menu();
+	else if( !stricmp( command, "OpenServerBrowser" ))
+		UI_InternetGames_Menu();
+	else if( !stricmp( command, "OpenCreateMultiplayerGameDialog" ))
+		UI_CreateGame_Menu();
+	else if( !stricmp( command, "OpenChangeGameDialog" ))
+		UI_CustomGame_Menu();
+	else if( !stricmp( command, "OpenPlayerListDialog" ))
+		UI_MultiPlayer_Menu();
+	else if( !stricmp( command, "Quit" ))
+		QuitDialogCb();
+	else if( !stricmp( command, "QuitNoConfirm" ))
+		EngFuncs::ClientCmd( false, "quit \"menu\"\n" );
+	else if( !stricmp( command, "ResumeGame" ))
+		UI_CloseMenu();
+	else if( !stricmp( command, "Disconnect" ))
+		DisconnectDialogCb();
+	else if( !strncmp( command, "engine ", 7 ))
+	{
+		char cmd[256];
+
+		snprintf( cmd, sizeof( cmd ), "%s\n", command + 7 );
+		EngFuncs::ClientCmd( false, cmd );
+		UI_CloseMenu();
+	}
+}
+
+void CMenuMain::GameMenuItemCb( void *pExtra )
+{
+	int item = (int)(intptr_t)pExtra;
+
+	if( item < 0 || item >= iNumGameMenuItems )
+		return;
+
+	GameMenuCommand( gameMenuCommands[item] );
+}
+
+void CMenuMain::UpdateGameMenuItems( void )
+{
+	bool isInGame = CL_IsActive();
+	bool isMulti = isInGame && gpGlobals->maxClients > 1;
+	int hoffset = ( 70 / 640.0 ) * 1024.0;
+	int ygap = (( 404 - 373 ) / 480.0 ) * 768.0;
+	int yoffset = ( 404 / 480.0 ) * 768.0 + ygap;
+	int i;
+
+	for( i = iNumGameMenuItems - 1; i >= 0; i-- )
+	{
+		bool visible = true;
+
+		if(( gameMenuFlags[i] & GAMEMENU_ONLYINGAME ) && !isInGame )
+			visible = false;
+		else if(( gameMenuFlags[i] & GAMEMENU_NOTMULTI ) && isMulti )
+			visible = false;
+		else if(( gameMenuFlags[i] & GAMEMENU_NOTSINGLE ) && !isMulti )
+			visible = false;
+
+		gameMenuItems[i].SetVisibility( visible );
+
+		if( visible )
+		{
+			gameMenuItems[i].SetCoord( hoffset, yoffset );
+			yoffset -= ygap;
+		}
+	}
+}
 
 void CMenuMain::QuitDialogCb()
 {
@@ -166,6 +329,50 @@ void CMenuMain::HazardCourseCb()
 
 void CMenuMain::_Init( void )
 {
+	bGameMenuRes = LoadGameMenuRes();
+
+	if( bGameMenuRes )
+	{
+		int i;
+
+		quitButton.SetPicture( ART_CLOSEBTN_N, ART_CLOSEBTN_F, ART_CLOSEBTN_D );
+		quitButton.iFlags = QMF_MOUSEONLY;
+		quitButton.eFocusAnimation = QM_HIGHLIGHTIFFOCUS;
+		quitButton.onReleased = VoidCb( &CMenuMain::QuitDialogCb );
+
+		minimizeBtn.SetPicture( ART_MINIMIZE_N, ART_MINIMIZE_F, ART_MINIMIZE_D );
+		minimizeBtn.iFlags = QMF_MOUSEONLY;
+		minimizeBtn.eFocusAnimation = QM_HIGHLIGHTIFFOCUS;
+		minimizeBtn.onReleased.SetCommand( false, "minimize\n" );
+
+		dialog.Link( this );
+
+		if( FBitSet( gMenu.m_gameinfo.flags, GFL_ANIMATED_TITLE ))
+		{
+			if( !uiStatic.lowmemory && animatedBanner.TryLoad())
+				AddItem( animatedBanner );
+		}
+		else
+		{
+			AddItem( movieBanner );
+		}
+
+		AddItem( banner );
+
+		for( i = 0; i < iNumGameMenuItems; i++ )
+		{
+			gameMenuItems[i].SetNameAndStatus( L( gameMenuLabels[i] ), "" );
+			gameMenuItems[i].iFlags |= QMF_NOTIFY;
+			gameMenuItems[i].onReleased = MenuCb( &CMenuMain::GameMenuItemCb );
+			gameMenuItems[i].onReleased.pExtra = (void *)(intptr_t)i;
+			AddItem( gameMenuItems[i] );
+		}
+
+		AddItem( minimizeBtn );
+		AddItem( quitButton );
+		return;
+	}
+
 	if( gMenu.m_gameinfo.trainmap[0] && stricmp( gMenu.m_gameinfo.trainmap, gMenu.m_gameinfo.startmap ) != 0 )
 		bTrainMap = true;
 	else bTrainMap = false;
@@ -310,6 +517,14 @@ UI_Main_Init
 */
 void CMenuMain::VidInit( bool connected )
 {
+	if( bGameMenuRes )
+	{
+		minimizeBtn.SetRect( uiStatic.width - 72, 13, 32, 32 );
+		quitButton.SetRect( uiStatic.width - 36, 13, 32, 32 );
+		UpdateGameMenuItems();
+		return;
+	}
+
 	int hoffset = ( 70 / 640.0 ) * 1024.0;
 
 	// in original menu Previews is located at specific point
@@ -394,6 +609,13 @@ void CMenuMain::_VidInit()
 
 void CMenuMain::Think()
 {
+	if( bGameMenuRes )
+	{
+		UpdateGameMenuItems();
+		CMenuFramework::Think();
+		return;
+	}
+
 	if( gpGlobals->developer )
 	{
 		if( !console.IsVisible( ))

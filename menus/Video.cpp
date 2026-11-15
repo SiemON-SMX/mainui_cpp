@@ -39,6 +39,8 @@ UI_Video_Menu
 */
 void UI_Video_Menu( void )
 {
+	static CMenuPicButton *advanced;
+
 	if( !menu_video->WasInit() )
 	{
 		menu_video->banner.SetPicture( ART_BANNER );
@@ -46,8 +48,12 @@ void UI_Video_Menu( void )
 		menu_video->AddItem( menu_video->banner );
 		menu_video->AddButton( L( "Video options" ), L( "Set video options such as screen size, gamma and image quality." ), PC_VID_OPT, UI_VidOptions_Menu, QMF_NOTIFY );
 		menu_video->AddButton( L( "Video modes" ), L( "Set video modes and configure 3D accelerators." ), PC_VID_MODES, UI_VidModes_Menu, QMF_NOTIFY );
+		advanced = menu_video->AddButton( "Advanced Options", L( "Game specific graphics settings, such as bump mapping and draw distance." ), PC_GAME_OPTIONS, UI_AdvUserOptions_Menu, QMF_NOTIFY );
 		menu_video->AddButton( L( "Done" ), L( "Go back to the previous menu" ), PC_DONE, VoidCb( &CMenuFramework::Hide ), QMF_NOTIFY );
 	}
+
+	if( advanced )
+		advanced->SetGrayed( !UI_AdvUserOptions_IsAvailable() );
 
 	menu_video->Show();
 }

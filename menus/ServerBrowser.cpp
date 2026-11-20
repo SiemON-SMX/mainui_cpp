@@ -38,6 +38,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define MAX_PING 9.999f
 #define FILTER_MAX_MAPS 16
 #define INTERNET_TAB_COUNT 4  // number of internet tabs; valid indices are 0..3
+#define LAN_TAB 4
 
 class CMenuServerBrowser;
 
@@ -375,7 +376,7 @@ private:
 class CMenuServerBrowser: public CMenuFramework
 {
 public:
-	CMenuServerBrowser() : CMenuFramework( "CMenuServerBrowser" ), gameListModel( this ), m_iLastRefreshTab( -1 ) { }
+	CMenuServerBrowser() : CMenuFramework( "CMenuServerBrowser" ), gameListModel( this ), m_bLanOnly( false ), m_bLanTab( false ), m_iLastRefreshTab( -1 ) { }
 	void Draw() override;
 	void Show() override;
 	void Hide() override;
@@ -383,8 +384,10 @@ public:
 
 	void SetLANOnly( bool lanOnly )
 	{
-		m_bLanOnly = lanOnly;
+		m_bLanTab = !lanOnly && tabSwitch.GetState() == LAN_TAB;
+		m_bLanOnly = lanOnly || m_bLanTab;
 	}
+	void UpdateLanTab( void );
 	void GetGamesList( void );
 	void ClearList( void );
 	void RefreshList( void );
@@ -443,6 +446,7 @@ public:
 	int   refreshTime2;
 
 	bool m_bLanOnly;
+	bool m_bLanTab;
 
 	CUtlVector<favlist_entry_t> favoritesList;
 	CUtlVector<favlist_entry_t> historyList;
@@ -495,9 +499,7 @@ void UI_GameMenu_ServerBrowser( void )
 
 void UI_InternetGames_Menu( void )
 {
-	menu_internetgames->SetLANOnly( false );
-
-	UI_ServerBrowser_Menu();
+	UI_GameMenu_ServerBrowser();
 }
 
 void UI_LanGame_Menu( void )
@@ -1019,9 +1021,43 @@ void CMenuServerBrowser::ViewGameInfo()
 	UI_ServerInfo_Menu( gameListModel.servers[idx].adr, gameListModel.servers[idx].name );
 }
 
+void CMenuServerBrowser::UpdateLanTab()
+{
+	if( m_bLanTab )
+	{
+		favorite->Hide();
+		addServer->Hide();
+		filterProtocol.Hide();
+		gameListModel.filterProtocol = 0;
+	}
+	else
+	{
+		favorite->Show();
+		addServer->Show();
+		filterProtocol.Show();
+		gameListModel.filterProtocol = filterProtocol.GetItem( );
+	}
+
+	RealignButtons();
+}
+
 void CMenuServerBrowser::OnTabSwitch()
 {
 	int idx = tabSwitch.GetState();
+
+	m_bLanTab = idx == LAN_TAB;
+	m_bLanOnly = m_bLanTab;
+	UpdateLanTab();
+
+	if( m_bLanTab )
+	{
+		EngFuncs::CvarSetValue( "cl_nat", 0.0f );
+		ClearList();
+		for( int i = 0; i < m_LanServers.Count(); ++i )
+			gameListModel.AddServerToList( m_LanServers[i].adr, m_LanServers[i].info, m_LanServers[i].favorite );
+		RefreshList();
+		return;
+	}
 
 	switch( idx )
 	{
@@ -1224,6 +1260,7 @@ void CMenuServerBrowser::_Init( void )
 	tabSwitch.AddSwitch( "NAT", true ); // intentionally not localized; hidden, NAT support deprecated
 	tabSwitch.AddSwitch( L( "Favorites" ));
 	tabSwitch.AddSwitch( L( "History" ));
+	tabSwitch.AddSwitch( L( "LAN" ));
 	tabSwitch.eTextAlignment = QM_CENTER;
 	tabSwitch.bMouseToggle = false;
 	tabSwitch.bKeepToggleWidth = true;
@@ -1406,7 +1443,7 @@ void CMenuServerBrowser::_VidInit()
 	refreshTime = uiStatic.realTime + 500; // delay before update 0.5 sec
 	refreshTime2 = uiStatic.realTime + 500;
 
-	if( m_bLanOnly )
+	if( m_bLanOnly && !m_bLanTab )
 	{
 		gameList.SetCoord( 360, 230 );
 	}
@@ -1453,7 +1490,7 @@ void CMenuServerBrowser::Show()
 {
 	CMenuFramework::Show();
 
-	if( m_bLanOnly )
+	if( m_bLanOnly && !m_bLanTab )
 	{
 		banner.SetPicture( ART_BANNER_LAN );
 		favorite->Hide();
@@ -1477,6 +1514,8 @@ void CMenuServerBrowser::Show()
 			ParseServerListFromFile( "favorite_servers.lst", favoritesList );
 		if( EngFuncs::FileExists( "history_servers.lst", true ) )
 			ParseServerListFromFile( "history_servers.lst", historyList );
+
+		UpdateLanTab();
 	}
 
 	RealignButtons();
@@ -1518,7 +1557,7 @@ void CMenuServerBrowser::SaveLists()
 	// and then re-sync with master server is just delayed
 	// ... but I'm tired with this, so let's do it next time :)
 
-	if( m_bLanOnly )
+	if( m_bLanOnly && !m_bLanTab )
 		return;
 
 	SaveServerListToFile( "favorite_servers.lst", favoritesList );

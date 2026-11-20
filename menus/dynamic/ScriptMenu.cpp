@@ -175,6 +175,14 @@ void CMenuScriptConfig::ListItemCvarGetCb(CMenuBaseItem *pSelf, void *pExtra)
 	}
 }
 
+static float ScriptClampValue( const scrvardef_t *var, float value )
+{
+	if( !stricmp( var->name, "gl_contrast" ))
+		return bound( 1.0f, value, 2.0f );
+
+	return value;
+}
+
 static void ScriptCvarGetNoSync( CMenuBaseItem *pSelf, void *pExtra )
 {
 	CMenuEditable *self = (CMenuEditable*)pSelf;
@@ -191,7 +199,7 @@ static void ScriptCvarGetNoSync( CMenuBaseItem *pSelf, void *pExtra )
 	}
 	case T_NUMBER:
 	{
-		self->SetOriginalValue( (float)atof( var->value ) );
+		self->SetOriginalValue( ScriptClampValue( var, (float)atof( var->value )));
 		break;
 	}
 	case T_STRING:
@@ -225,8 +233,13 @@ static void ScriptCvarGetSync( CMenuBaseItem *pSelf, void *pExtra )
 	{
 		float eng = EngFuncs::GetCvarFloat( var->name );
 		float scr = (float)atof( var->value );
-		if( eng != scr ) self->SetOriginalValue( eng );
-		else self->SetOriginalValue( scr );
+		if( ScriptClampValue( var, eng ) != eng )
+		{
+			eng = ScriptClampValue( var, eng );
+			EngFuncs::CvarSetValue( var->name, eng );
+		}
+		if( eng != scr ) self->SetOriginalValue( ScriptClampValue( var, eng ));
+		else self->SetOriginalValue( ScriptClampValue( var, scr ));
 		break;
 	}
 	case T_STRING:
@@ -375,6 +388,12 @@ void CMenuScriptConfig::_Init( void )
 			if( var->number.fMax == -1 ) fMax = 9999;
 			else fMax = var->number.fMax;
 
+			if( !stricmp( var->name, "gl_contrast" ))
+			{
+				fMin = 1;
+				fMax = 2;
+			}
+
 			spinControl->Setup( fMin, fMax, 1 );
 			editable = spinControl;
 
@@ -501,11 +520,11 @@ static const char g_szCoFUserScript[] =
 	"\t\"gl_specular\" { \"Specular highlights\" { BOOL } { \"1\" } }\n"
 	"\t\"gl_highspecular\" { \"High quality specular\" { BOOL } { \"1\" } }\n"
 	"\t\"gl_detailtex\" { \"Detail textures\" { BOOL } { \"1\" } }\n"
-	"\t\"gl_screenblur\" { \"Screen blur\" { BOOL } { \"1\" } }\n"
+	"\t\"gl_screenblur\" { \"Screen blur\" { BOOL } { \"0\" } }\n"
 	"\t\"cl_propdistance\" { \"Limit prop draw distance\" { BOOL } { \"0\" } }\n"
 	"\t\"r_weather\" { \"Weather effects\" { BOOL } { \"1\" } }\n"
 	"\t\"cl_ripples\" { \"Water ripples\" { BOOL } { \"1\" } }\n"
-	"\t\"cl_vignette\" { \"Vignette\" { BOOL } { \"1\" } }\n"
+	"\t\"cl_vignette\" { \"Vignette\" { BOOL } { \"0\" } }\n"
 	"\t\"cl_noiseeffect\" { \"Film grain\" { BOOL } { \"0\" } }\n"
 	"\t\"cl_noiseamount\" { \"Film grain amount\" { NUMBER 0 1 } { \"0.5\" } }\n"
 	"\t\"cl_cameraeffect\" { \"Camera viewfinder effect\" { BOOL } { \"0\" } }\n"

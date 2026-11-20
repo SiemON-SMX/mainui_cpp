@@ -465,11 +465,8 @@ ADD_MENU4( menu_langame, NULL, UI_LanGame_Menu, NULL );
 CMenuServerBrowser::Menu
 =================
 */
-void UI_ServerBrowser_Menu( void )
+static void UI_ServerBrowser_Show( void )
 {
-	if ( gMenu.m_gameinfo.gamemode == GAME_SINGLEPLAYER_ONLY )
-		return;
-
 	// stop demos to allow network sockets to open
 	if ( gpGlobals->demoplayback && EngFuncs::GetCvarFloat( "cl_background" ))
 	{
@@ -479,6 +476,21 @@ void UI_ServerBrowser_Menu( void )
 	}
 
 	menu_internetgames->Show();
+}
+
+void UI_ServerBrowser_Menu( void )
+{
+	if ( gMenu.m_gameinfo.gamemode == GAME_SINGLEPLAYER_ONLY )
+		return;
+
+	UI_ServerBrowser_Show();
+}
+
+void UI_GameMenu_ServerBrowser( void )
+{
+	menu_internetgames->SetLANOnly( false );
+
+	UI_ServerBrowser_Show();
 }
 
 void UI_InternetGames_Menu( void )

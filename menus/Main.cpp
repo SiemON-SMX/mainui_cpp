@@ -99,6 +99,7 @@ private:
 	int iNumGameMenuItems;
 	CMenuPicButton gameMenuItems[MAX_GAMEMENU_ITEMS];
 	char gameMenuLabels[MAX_GAMEMENU_ITEMS][128];
+	char gameMenuNames[MAX_GAMEMENU_ITEMS][128];
 	char gameMenuCommands[MAX_GAMEMENU_ITEMS][256];
 	int gameMenuFlags[MAX_GAMEMENU_ITEMS];
 };
@@ -183,7 +184,7 @@ void CMenuMain::GameMenuCommand( const char *command )
 	else if( !stricmp( command, "OpenOptionsDialog" ))
 		UI_Options_Menu();
 	else if( !stricmp( command, "OpenServerBrowser" ))
-		UI_InternetGames_Menu();
+		UI_GameMenu_ServerBrowser();
 	else if( !stricmp( command, "OpenCreateMultiplayerGameDialog" ))
 		UI_CreateGame_Menu();
 	else if( !stricmp( command, "OpenChangeGameDialog" ))
@@ -197,7 +198,7 @@ void CMenuMain::GameMenuCommand( const char *command )
 	else if( !stricmp( command, "ResumeGame" ))
 		UI_CloseMenu();
 	else if( !stricmp( command, "Disconnect" ))
-		DisconnectDialogCb();
+		EngFuncs::ClientCmd( false, "disconnect\n" );
 	else if( !strncmp( command, "engine ", 7 ))
 	{
 		char cmd[256];
@@ -235,8 +236,6 @@ void CMenuMain::UpdateGameMenuItems( void )
 			visible = false;
 		else if(( gameMenuFlags[i] & GAMEMENU_NOTMULTI ) && isMulti )
 			visible = false;
-		else if(( gameMenuFlags[i] & GAMEMENU_NOTSINGLE ) && !isMulti )
-			visible = false;
 
 		gameMenuItems[i].SetVisibility( visible );
 
@@ -246,6 +245,9 @@ void CMenuMain::UpdateGameMenuItems( void )
 			yoffset -= ygap;
 		}
 	}
+
+	console.SetVisibility( gpGlobals->developer );
+	console.SetCoord( hoffset, yoffset );
 }
 
 void CMenuMain::QuitDialogCb()
@@ -331,6 +333,17 @@ void CMenuMain::_Init( void )
 {
 	bGameMenuRes = LoadGameMenuRes();
 
+	// console
+	console.SetNameAndStatus( L( "GameUI_Console" ), bGameMenuRes ? "" : L( "Show console" ) );
+	console.iFlags |= QMF_NOTIFY;
+	console.SetPicture( PC_CONSOLE );
+	console.SetVisibility( gpGlobals->developer );
+	SET_EVENT_MULTI( console.onReleased,
+	{
+		UI_SetActiveMenu( false );
+		EngFuncs::KEY_SetDest( KEY_CONSOLE );
+	});
+
 	if( bGameMenuRes )
 	{
 		int i;
@@ -361,13 +374,30 @@ void CMenuMain::_Init( void )
 
 		for( i = 0; i < iNumGameMenuItems; i++ )
 		{
-			gameMenuItems[i].SetNameAndStatus( L( gameMenuLabels[i] ), "" );
+			const char *src = L( gameMenuLabels[i] );
+			char *dst = gameMenuNames[i];
+			char *end = gameMenuNames[i] + sizeof( gameMenuNames[i] ) - 1;
+
+			while( *src && dst < end )
+			{
+				if( *src == '&' )
+				{
+					src++;
+					if( *src != '&' )
+						continue;
+				}
+				*dst++ = *src++;
+			}
+			*dst = 0;
+
+			gameMenuItems[i].SetNameAndStatus( gameMenuNames[i], "" );
 			gameMenuItems[i].iFlags |= QMF_NOTIFY;
 			gameMenuItems[i].onReleased = MenuCb( &CMenuMain::GameMenuItemCb );
 			gameMenuItems[i].onReleased.pExtra = (void *)(intptr_t)i;
 			AddItem( gameMenuItems[i] );
 		}
 
+		AddItem( console );
 		AddItem( minimizeBtn );
 		AddItem( quitButton );
 		return;
@@ -380,17 +410,6 @@ void CMenuMain::_Init( void )
 	if( EngFuncs::GetCvarFloat( "host_allow_changegame" ))
 		bCustomGame = true;
 	else bCustomGame = false;
-
-	// console
-	console.SetNameAndStatus( L( "GameUI_Console" ), L( "Show console" ) );
-	console.iFlags |= QMF_NOTIFY;
-	console.SetPicture( PC_CONSOLE );
-	console.SetVisibility( gpGlobals->developer );
-	SET_EVENT_MULTI( console.onReleased,
-	{
-		UI_SetActiveMenu( false );
-		EngFuncs::KEY_SetDest( KEY_CONSOLE );
-	});
 
 	resumeGame.SetNameAndStatus( L( "GameUI_GameMenu_ResumeGame" ), L( "StringsList_188" ) );
 	resumeGame.SetPicture( PC_RESUME_GAME );
